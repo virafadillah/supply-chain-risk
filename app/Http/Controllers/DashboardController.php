@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Country;
 use App\Models\Port;
 use App\Services\OpenMeteoService;
+use App\Services\WorldBankService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\RedirectResponse;
@@ -15,10 +16,12 @@ use Illuminate\View\View;
 class DashboardController extends Controller
 {
     protected OpenMeteoService $weatherService;
+    protected WorldBankService $worldBankService;
 
-    public function __construct(OpenMeteoService $weatherService)
+    public function __construct(OpenMeteoService $weatherService, WorldBankService $worldBankService)
     {
         $this->weatherService = $weatherService;
+        $this->worldBankService = $worldBankService;
     }
 
     public function index(): View
@@ -67,9 +70,16 @@ class DashboardController extends Controller
         return view('dashboard.currency', compact('countries'));
     }
 
-    public function news(): View
+    public function news(Request $request): View
     {
-        $news = \App\Models\NewsCache::with('country')->latest('published_at')->paginate(15);
+        $query = \App\Models\NewsCache::with('country')->latest('published_at');
+
+        if ($request->filled('category')) {
+            $query->where('category', $request->input('category'));
+        }
+
+        $news = $query->paginate(15)->withQueryString();
+
         return view('dashboard.news', compact('news'));
     }
 
@@ -198,7 +208,7 @@ class DashboardController extends Controller
             $responses = Http::pool(function ($pool) use ($needFetch) {
                 foreach ($needFetch as $country) {
                     $pool->as((string) $country->id)
-                        ->timeout(15)
+                        ->timeout(5)
                         ->get('https://api.open-meteo.com/v1/forecast', [
                             'latitude' => $country->latitude,
                             'longitude' => $country->longitude,
@@ -211,8 +221,6 @@ class DashboardController extends Controller
             foreach ($needFetch as $country) {
                 $response = $responses[(string) $country->id] ?? null;
 
-                // Hasil pool bisa berupa Response (sukses/gagal HTTP) ATAU ConnectionException
-                // (gagal konek total). Cek instanceof dulu sebelum panggil ->successful().
                 $data = ($response instanceof \Illuminate\Http\Client\Response && $response->successful())
                     ? $response->json()
                     : [];
@@ -223,7 +231,7 @@ class DashboardController extends Controller
                     'precipitation' => $data['current']['precipitation'] ?? null,
                 ];
 
-                Cache::put("weather_country_{$country->id}", $weather, 1800);
+                Cache::put("weather_country_{$country->id}", $weather, 43200);
                 $weatherData[$country->id] = $weather;
             }
         }
@@ -267,5 +275,35 @@ class DashboardController extends Controller
         }
 
         return 'cerah';
+    }
+
+    // GET /chart-data/gdp-trend/{country}
+    public function gdpTrendData(Country $country): JsonResponse
+    {
+        $history = Cache::remember(
+            "gdp_history_{$country->iso3}",
+            43200,
+            fn () => $this->worldBankService->getGdpHistory($country->iso3, 10)
+        );
+
+        return response()->json([
+            'labels' => array_column($history, 'year'),
+            'data' => array_map(fn ($h) => round($h['value'] / 1e9, 2), $history),
+        ]);
+    }
+
+    // GET /chart-data/inflation-trend/{country}
+    public function inflationTrendData(Country $country): JsonResponse
+    {
+        $history = Cache::remember(
+            "inflation_history_{$country->iso3}",
+            43200,
+            fn () => $this->worldBankService->getInflationHistory($country->iso3, 10)
+        );
+
+        return response()->json([
+            'labels' => array_column($history, 'year'),
+            'data' => array_map(fn ($h) => round($h['value'], 2), $history),
+        ]);
     }
 }

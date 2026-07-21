@@ -103,9 +103,9 @@ class RiskScoringService
     protected function cacheNewsArticles(Country $country, array $articles): void
     {
         foreach ($articles as $article) {
-            $analysis = $this->newsService->analyzeSentiment(
-                ($article['title'] ?? '') . ' ' . ($article['description'] ?? '')
-            );
+            $text = ($article['title'] ?? '') . ' ' . ($article['description'] ?? '');
+            $analysis = $this->newsService->analyzeSentiment($text);
+            $category = $this->newsService->classifyCategory($text);
 
             $country->newsCache()->updateOrCreate(
                 ['url' => $article['url'] ?? null],
@@ -114,6 +114,7 @@ class RiskScoringService
                     'description' => $article['description'] ?? null,
                     'source' => $article['source']['name'] ?? null,
                     'sentiment' => $analysis['sentiment'],
+                    'category' => $category,
                     'positive_score' => $analysis['positiveScore'],
                     'negative_score' => $analysis['negativeScore'],
                     'published_at' => $article['publishedAt'] ?? null,

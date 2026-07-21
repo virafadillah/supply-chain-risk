@@ -5,8 +5,13 @@ use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\WatchlistController;
 use Illuminate\Support\Facades\Route;
 
+// Root ("/") langsung diarahkan:
+// - kalau sudah login -> ke Dashboard
+// - kalau belum login -> ke halaman Login
 Route::get('/', function () {
-    return view('welcome');
+    return auth()->check()
+        ? redirect()->route('dashboard')
+        : redirect()->route('login');
 });
 
 Route::middleware('auth')->group(function () {
@@ -27,6 +32,8 @@ Route::middleware('auth')->group(function () {
     Route::get('/chart-data/risk-history/{country}', [DashboardController::class, 'riskHistoryData'])->name('chart.risk-history');
     Route::get('/chart-data/map', [DashboardController::class, 'mapData'])->name('chart.map');
     Route::get('/chart-data/weather-map', [DashboardController::class, 'weatherMapData'])->name('chart.weather-map');
+    Route::get('/chart-data/gdp-trend/{country}', [DashboardController::class, 'gdpTrendData'])->name('chart.gdp-trend');
+    Route::get('/chart-data/inflation-trend/{country}', [DashboardController::class, 'inflationTrendData'])->name('chart.inflation-trend');
 
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');

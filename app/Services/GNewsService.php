@@ -62,4 +62,34 @@ class GNewsService
 
         return round(($negativeCount / count($articles)) * 100, 2);
     }
+
+    // Klasifikasi kategori berita berbasis kata kunci (lexicon), sama pola-nya kayak sentiment analysis
+    public function classifyCategory(string $text): string
+    {
+        $text = strtolower($text);
+
+        $categories = [
+            'logistics' => ['logistics', 'supply chain', 'warehouse', 'freight', 'distribution'],
+            'shipping' => ['ship', 'vessel', 'cargo', 'container', 'port', 'maritime'],
+            'trade' => ['trade', 'export', 'import', 'tariff', 'customs', 'agreement'],
+            'economy' => ['economy', 'economic', 'gdp', 'inflation', 'market', 'growth', 'recession'],
+        ];
+
+        $scores = [];
+
+        foreach ($categories as $category => $keywords) {
+            $score = 0;
+            foreach ($keywords as $keyword) {
+                if (str_contains($text, $keyword)) {
+                    $score++;
+                }
+            }
+            $scores[$category] = $score;
+        }
+
+        $bestCategory = array_search(max($scores), $scores);
+
+        // Kalau tidak ada kata kunci yang cocok sama sekali, masuk kategori "economy" (default paling umum)
+        return max($scores) > 0 ? $bestCategory : 'economy';
+    }
 }
