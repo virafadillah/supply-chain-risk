@@ -10,9 +10,18 @@ class NewsCache extends Model
     protected $table = 'news_cache';
 
     protected $fillable = [
-        'country_id', 'title', 'description', 'url', 'source',
-        'sentiment', 'category', 'positive_score', 'negative_score', 'published_at',
-    ];
+    'country_id',
+    'title',
+    'description',
+    'image',
+    'url',
+    'source',
+    'sentiment',
+    'category',
+    'positive_score',
+    'negative_score',
+    'published_at',
+];
 
     protected $casts = ['published_at' => 'datetime'];
 

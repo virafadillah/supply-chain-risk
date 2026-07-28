@@ -1,11 +1,15 @@
 <x-app-layout>
     <x-slot name="header">
-        <h2 class="font-semibold text-xl text-gray-800 leading-tight">Admin — Edit Artikel</h2>
+        <h2 class="font-semibold text-xl text-gray-800 leading-tight">Admin Panel</h2>
     </x-slot>
 
     <div class="py-6">
-        <div class="max-w-3xl mx-auto sm:px-6 lg:px-8">
+        <div class="max-w-7xl mx-auto sm:px-6 lg:px-8">
             <div class="bg-white shadow-sm sm:rounded-lg p-6">
+
+                @include('admin.partials.tabs')
+
+                <h5 class="fw-bold mb-4">Edit Artikel</h5>
 
                 @if ($errors->any())
                     <div class="alert alert-danger">
@@ -18,29 +22,26 @@
                 @endif
 
                 <form action="{{ route('admin.articles.update', $article) }}" method="POST">
-                    @csrf @method('PUT')
-
+                    @csrf
+                    @method('PUT')
                     <div class="mb-3">
-                        <label class="form-label">Judul</label>
+                        <label class="form-label fw-semibold">Judul</label>
                         <input type="text" name="title" class="form-control" value="{{ old('title', $article->title) }}" required>
                     </div>
-
                     <div class="mb-3">
-                        <label class="form-label">Kategori</label>
+                        <label class="form-label fw-semibold">Kategori (opsional)</label>
                         <input type="text" name="category" class="form-control" value="{{ old('category', $article->category) }}">
                     </div>
-
                     <div class="mb-3">
-                        <label class="form-label">Konten</label>
+                        <label class="form-label fw-semibold">Isi Artikel</label>
                         <textarea name="content" class="form-control" rows="8" required>{{ old('content', $article->content) }}</textarea>
                     </div>
-
-                    <div class="mb-3 form-check">
-                        <input type="checkbox" name="is_published" value="1" class="form-check-input" id="isPublished" {{ $article->is_published ? 'checked' : '' }}>
-                        <label class="form-check-label" for="isPublished">Published</label>
+                    <div class="form-check mb-4">
+                        <input class="form-check-input" type="checkbox" name="is_published" value="1" id="isPublished" {{ old('is_published', $article->is_published) ? 'checked' : '' }}>
+                        <label class="form-check-label" for="isPublished">Publikasikan</label>
                     </div>
 
-                    <button type="submit" class="btn btn-primary">Simpan</button>
+                    <button type="submit" class="btn btn-add">Simpan Perubahan</button>
                     <a href="{{ route('admin.articles.index') }}" class="btn btn-outline-secondary">Batal</a>
                 </form>
 

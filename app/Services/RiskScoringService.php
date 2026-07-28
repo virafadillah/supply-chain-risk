@@ -13,7 +13,6 @@ class RiskScoringService
     protected ExchangeRateService $exchangeRateService;
     protected GNewsService $newsService;
 
-    // Bobot sesuai spesifikasi
     protected float $weatherWeight = 0.30;
     protected float $inflationWeight = 0.20;
     protected float $currencyWeight = 0.10;
@@ -33,59 +32,131 @@ class RiskScoringService
 
     public function calculateForCountry(Country $country): RiskScore
     {
-        // 1. Weather Risk
-        $weather = $this->weatherService->getWeather($country->latitude, $country->longitude);
+        /*
+        |--------------------------------------------------------------------------
+        | WEATHER RISK
+        |--------------------------------------------------------------------------
+        */
+
+        $weather = $this->weatherService->getWeather(
+            $country->latitude,
+            $country->longitude
+        );
+
         $weatherRisk = $this->weatherService->calculateWeatherRisk($weather);
 
-        // 2. Inflation Risk (pakai data World Bank kalau ada, fallback ke data tersimpan di countries)
-        $inflation = $this->worldBankService->getInflation($country->iso3) ?? $country->inflation_rate;
-        $inflationRisk = $this->worldBankService->calculateInflationRisk($inflation);
+        /*
+        |--------------------------------------------------------------------------
+        | INFLATION RISK
+        |--------------------------------------------------------------------------
+        */
 
-        // 3. Currency Risk
-        $currencyRisk = $this->exchangeRateService->getVolatility($country->currency_code);
+        $inflation = $this->worldBankService->getInflation($country->iso3)
+            ?? $country->inflation_rate;
 
-        // 4. News Risk
-        $articles = $this->newsService->search($country->name, 10);
-        $newsRisk = $this->newsService->calculateNewsRisk($articles);
+        $inflationRisk = $this->worldBankService
+            ->calculateInflationRisk($inflation);
 
-        // Simpan artikel ke news_cache (opsional, biar bisa ditampilkan di News Intelligence dashboard)
-        $this->cacheNewsArticles($country, $articles);
+        /*
+        |--------------------------------------------------------------------------
+        | CURRENCY RISK
+        |--------------------------------------------------------------------------
+        */
 
-        // Total Risk (weighted)
+        $currencyRisk = $this->exchangeRateService
+            ->getVolatility($country->currency_code);
+
+        /*
+        |--------------------------------------------------------------------------
+        | NEWS RISK
+        |--------------------------------------------------------------------------
+        */
+
+        $articles = $this->newsService->search(
+            $country->name,
+            10
+        );
+
+        $newsRisk = $this->newsService
+            ->calculateNewsRisk($articles);
+
+        /*
+        |--------------------------------------------------------------------------
+        | CACHE NEWS
+        |--------------------------------------------------------------------------
+        */
+
+        $this->cacheNewsArticles(
+            $country,
+            $articles
+        );
+
+        /*
+        |--------------------------------------------------------------------------
+        | TOTAL RISK
+        |--------------------------------------------------------------------------
+        */
+
         $totalRisk = round(
-            ($weatherRisk * $this->weatherWeight) +
-            ($inflationRisk * $this->inflationWeight) +
-            ($currencyRisk * $this->currencyWeight) +
+
+            ($weatherRisk * $this->weatherWeight)
+
+            +
+
+            ($inflationRisk * $this->inflationWeight)
+
+            +
+
+            ($currencyRisk * $this->currencyWeight)
+
+            +
+
             ($newsRisk * $this->newsWeight),
+
             2
+
         );
 
         $riskLevel = $this->determineRiskLevel($totalRisk);
 
         return RiskScore::create([
+
             'country_id' => $country->id,
+
             'weather_risk' => $weatherRisk,
+
             'inflation_risk' => $inflationRisk,
+
             'currency_risk' => $currencyRisk,
+
             'news_risk' => $newsRisk,
+
             'total_risk' => $totalRisk,
+
             'risk_level' => $riskLevel,
+
             'calculated_at' => Carbon::now(),
+
         ]);
     }
-
     public function calculateForAllCountries(): array
     {
         $results = [];
 
-        foreach (Country::all() as $country) {
+        foreach (Country::orderBy('name')->get() as $country) {
+
             try {
+
                 $results[] = $this->calculateForCountry($country);
-            } catch (\Exception $e) {
-                // Skip negara yang gagal (misal API down), lanjut ke negara berikutnya
+
+            } catch (\Throwable $e) {
+
                 report($e);
+
                 continue;
+
             }
+
         }
 
         return $results;
@@ -94,32 +165,97 @@ class RiskScoringService
     protected function determineRiskLevel(float $totalRisk): string
     {
         return match (true) {
+
             $totalRisk < 30 => 'low',
+
             $totalRisk < 60 => 'medium',
+
             default => 'high',
+
         };
     }
 
-    protected function cacheNewsArticles(Country $country, array $articles): void
+    /**
+     * Simpan berita ke news_cache
+     */
+    protected function cacheNewsArticles(
+        Country $country,
+        array $articles
+    ): void
     {
+
         foreach ($articles as $article) {
-            $text = ($article['title'] ?? '') . ' ' . ($article['description'] ?? '');
-            $analysis = $this->newsService->analyzeSentiment($text);
-            $category = $this->newsService->classifyCategory($text);
+
+            $title = trim($article['title'] ?? '');
+
+            $description = trim($article['description'] ?? '');
+
+            $text = strtolower($title . ' ' . $description);
+
+            if ($title == '') {
+                continue;
+            }
+
+            $analysis = $this->newsService
+                ->analyzeSentiment($title . ' ' . $description);
+
+            $category = $this->newsService
+                ->classifyCategory($title . ' ' . $description);
+                            /*
+            |--------------------------------------------------------------------------
+            | Skip berita yang tidak berkaitan dengan negara
+            |--------------------------------------------------------------------------
+            */
+
+            $countryName = strtolower($country->name);
+
+            if (
+                !str_contains($text, $countryName) &&
+                !str_contains(strtolower($title), $countryName)
+            ) {
+                continue;
+            }
+
+            /*
+            |--------------------------------------------------------------------------
+            | Simpan / Update berita
+            |--------------------------------------------------------------------------
+            */
 
             $country->newsCache()->updateOrCreate(
-                ['url' => $article['url'] ?? null],
+
                 [
-                    'title' => $article['title'] ?? 'No title',
-                    'description' => $article['description'] ?? null,
-                    'source' => $article['source']['name'] ?? null,
+                    'country_id' => $country->id,
+                    'url' => $article['url'] ?? '',
+                ],
+
+                [
+
+                    'title' => $title,
+
+                    'description' => $description,
+
+                    'image' => $article['image'] ?? null,
+
+                    'source' => $article['source']['name'] ?? 'Unknown',
+
                     'sentiment' => $analysis['sentiment'],
+
                     'category' => $category,
+
                     'positive_score' => $analysis['positiveScore'],
+
                     'negative_score' => $analysis['negativeScore'],
-                    'published_at' => $article['publishedAt'] ?? null,
+
+                    'published_at' => !empty($article['publishedAt'])
+                        ? Carbon::parse($article['publishedAt'])
+                        : now(),
+
                 ]
+
             );
+
         }
+
     }
-}
+    }

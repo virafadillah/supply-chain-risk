@@ -1,11 +1,17 @@
 <x-app-layout>
     <x-slot name="header">
-        <h2 class="font-semibold text-xl text-gray-800 leading-tight">Admin — Manage Users</h2>
+        <h2 class="font-semibold text-xl text-gray-800 leading-tight">Admin Panel</h2>
     </x-slot>
 
     <div class="py-6">
         <div class="max-w-7xl mx-auto sm:px-6 lg:px-8">
             <div class="bg-white shadow-sm sm:rounded-lg p-6">
+
+                @include('admin.partials.tabs')
+
+                <div class="admin-card-header">
+                    <h5 class="mb-0 fw-bold">Kelola User</h5>
+                </div>
 
                 @if (session('success'))
                     <div class="alert alert-success">{{ session('success') }}</div>
