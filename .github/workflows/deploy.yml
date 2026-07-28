@@ -1,0 +1,71 @@
+name: Deploy to Rumahweb (vira.synectra.xyz)
+
+on:
+  push:
+    branches:
+      - main
+      - master
+
+jobs:
+  web-deploy:
+    name: 🚀 Deploy Laravel to Subdomain
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 🚚 Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: ⚙️ Setup PHP Environment
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          extensions: mbstring, xml, ctype, iconv, intl, pdo, pdo_mysql, bcmath, zip
+          coverage: none
+
+      - name: 📦 Install Composer Dependencies
+        run: |
+          composer install --no-dev --optimize-autoloader --no-interaction --prefer-dist
+
+      - name: 🟢 Setup Node.js Environment
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: ⚡ Install Node Modules & Build Assets
+        run: |
+          npm ci || npm install
+          npm run build
+
+      - name: 🤐 Zip Vendor Directory
+        run: |
+          zip -r vendor.zip vendor/
+
+      - name: 📂 Upload Files via FTP to Rumahweb
+        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
+        with:
+          server: ${{ secrets.FTP_SERVER || 'ftp.synectra.xyz' }}
+          username: ${{ secrets.FTP_USERNAME || 'synf6654' }}
+          password: ${{ secrets.FTP_PASSWORD || 'CgsMHqwKHC9M21' }}
+          port: ${{ secrets.FTP_PORT || 21 }}
+          protocol: ftp
+          local-dir: ./
+          server-dir: public_html/vira/
+          exclude: |
+            **/.git*
+            **/.git*/**
+            **/node_modules/**
+            **/tests/**
+            **/vendor/**
+            .env
+            .env.*
+            phpunit.xml
+            README.md
+            vite.config.js
+            tailwind.config.js
+            postcss.config.js
+
+      - name: 🔓 Trigger Auto-Extract vendor.zip on Server
+        run: |
+          echo "Triggering auto-extraction on server..."
+          RESPONSE=$(curl -s "http://vira.synectra.xyz/extract-vendor.php?key=${{ secrets.EXTRACT_SECRET || 'vira_secret_extract_key_2026' }}")
+          echo "Server response: $RESPONSE"
