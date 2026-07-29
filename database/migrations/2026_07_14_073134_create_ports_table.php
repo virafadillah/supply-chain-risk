@@ -12,7 +12,7 @@ return new class extends Migration
             $table->id();
             $table->string('unlocode', 10)->unique()->nullable();
             $table->string('name');
-            $table->foreignId('country_id')->constrained()->cascadeOnDelete();
+            $table->foreignId('country_id')->nullable()->constrained()->nullOnDelete();
             $table->decimal('latitude', 10, 6);
             $table->decimal('longitude', 10, 6);
             $table->string('port_type')->nullable();

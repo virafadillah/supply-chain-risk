@@ -65,6 +65,7 @@ class PortSeeder extends Seeder
         ];
 
         foreach ($ports as $port) {
+            $port['port_type'] = $port['port_type'] ?? 'seaport';
             Port::updateOrCreate(['id' => $port['id']], $port);
         }
     }
