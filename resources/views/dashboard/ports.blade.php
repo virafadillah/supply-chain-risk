@@ -37,15 +37,10 @@
 <div class="container-fluid py-4">
 
 @php
-
 $totalPort = $ports->count();
-
-$lowRisk = $ports->filter(fn($p)=>optional($p->country->latestRiskScore)->risk_level=='low')->count();
-
-$mediumRisk = $ports->filter(fn($p)=>optional($p->country->latestRiskScore)->risk_level=='medium')->count();
-
-$highRisk = $ports->filter(fn($p)=>optional($p->country->latestRiskScore)->risk_level=='high')->count();
-
+$lowRisk = $ports->filter(fn($p) => $p->country?->latestRiskScore?->risk_level === 'low')->count();
+$mediumRisk = $ports->filter(fn($p) => $p->country?->latestRiskScore?->risk_level === 'medium')->count();
+$highRisk = $ports->filter(fn($p) => $p->country?->latestRiskScore?->risk_level === 'high')->count();
 @endphp
 
 <div class="row mb-4">
@@ -251,11 +246,11 @@ placeholder="🔍 Cari pelabuhan...">
 
 @php
 
-$risk = $port->country->latestRiskScore;
+$risk = $port->country?->latestRiskScore;
 
-$riskLevel = $risk->risk_level ?? 'low';
+$riskLevel = $risk?->risk_level ?? 'low';
 
-$riskScore = $risk->total_risk ?? rand(30,90);
+$riskScore = $risk?->total_risk ?? rand(30,90);
 
 $riskClass = match($riskLevel){
 
@@ -285,7 +280,7 @@ default=>'⚓'
 
 <div class="col-xl-4 col-lg-6 port-card"
 
-data-search="{{ strtolower($port->name.' '.$port->country->name.' '.$port->unlocode) }}">
+data-search="{{ strtolower($port->name.' '.($port->country?->name ?? '').' '.$port->unlocode) }}">
 
 <div class="card port-modern border-0 shadow h-100">
 
@@ -309,7 +304,7 @@ data-search="{{ strtolower($port->name.' '.$port->country->name.' '.$port->unloc
 
 <div class="text-muted">
 
-📍 {{ $port->country->name }}
+📍 {{ $port->country?->name ?? 'N/A' }}
 
 </div>
 
